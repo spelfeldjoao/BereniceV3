@@ -1,0 +1,1906 @@
+// ============================================================================
+//  BERE 3 - SISTEMA DA BERE: A PROFISSIONALIZACAO
+//  DISCIPLINA : ALGORITMOS E ESTRUTURA DE DADOS
+//  ARQUIVO    : Bere3_Organizado.c
+// ============================================================================
+
+// |------ EXPLICAÇÃO DAS BIBLIOTECAS UTILIZADAS ------|
+
+// A BIBLIOTECA <stdio.h> ( Standard Input / Output ) CUIDA DA ENTRADA E DA SAÍDA DE DADOS
+// printf() --> IMPRIME NA TELA
+// fgets() --> LÊ UMA LINHA DE TEXTO COM SEGURANÇA ( RESPEITA O TAMANHO DO BUFFER )
+// sscanf() --> LÊ DADOS DE DENTRO DE UMA STRING ( USADO PARA INTERPRETAR AS LINHAS DOS ARQUIVOS )
+// sprintf() --> ESCREVE FORMATADO DENTRO DE UMA STRING ( USADO PARA MONTAR O CPF )
+// fopen() / fclose() / fprintf() --> MANIPULAÇÃO DE ARQUIVOS
+
+// A BIBLIOTECA <stdlib.h> ( Standard Library ) TEM FUNÇÕES UTILITÁRIAS GERAIS
+// realloc() / free() --> ALOCAÇÃO DINÂMICA DE MEMÓRIA ( AUMENTAR O VETOR E LIBERAR )
+// strtol() / strtod() --> CONVERTEM TEXTO EM NÚMERO INTEIRO / DECIMAL INFORMANDO ONDE PAROU
+// exit() --> ENCERRA O PROGRAMA
+// system() --> EXECUTA UM COMANDO DO SISTEMA ( USADO PARA LIMPAR A TELA )
+
+// A BIBLIOTECA <string.h> TEM FUNÇÕES PARA MANIPULAR STRINGS ( VETORES DE char TERMINADOS EM '\0' )
+// strlen() --> TAMANHO DA STRING
+// strcpy() / strncpy() --> COPIA STRINGS ( strncpy COM LIMITE DE TAMANHO )
+// strcmp() --> COMPARA STRINGS ( RETORNA 0 QUANDO SÃO IGUAIS )
+// strcspn() --> ACHA A POSIÇÃO DO PRIMEIRO CARACTERE QUE ESTÁ EM UM CONJUNTO ( USADO PARA ACHAR O ENTER )
+// memset() --> PREENCHE UM BLOCO DE MEMÓRIA COM UM VALOR ( USADO PARA ZERAR STRUCTS )
+
+// A BIBLIOTECA <ctype.h> TEM FUNÇÕES PARA CLASSIFICAR E CONVERTER CARACTERES INDIVIDUAIS
+// isdigit() --> É UM DÍGITO ( 0 - 9 )?
+// tolower() --> CONVERTE A LETRA PARA MINÚSCULA
+
+// |------ FIM DA EXPLICAÇÃO DAS BIBLIOTECAS UTILIZADAS ------|
+
+// |---------------------------------------------------------|
+
+// |------ INSERINDO AS BIBLIOTECAS ------|
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+// |------ FIM DAS BIBLIOTECAS ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE CONSTANTES ------|
+
+// ESSA PARTE DEFINE OS VALORES FIXOS DO PROGRAMA. SÃO VALORES QUE NÃO MUDAM DURANTE A EXECUÇÃO
+// E QUE VOCÊ QUER PODER ALTERAR EM UM ÚNICO LUGAR
+
+// #define ( MACRO ) --> INSTRUÇÃO PARA O PRÉ-PROCESSADOR. ANTES DE COMPILAR, ELE TROCA TODA OCORRÊNCIA
+//                       DE ( Reserva_Troco ) NO CÓDIGO PELO TEXTO 50.00. NÃO É VARIÁVEL, NÃO OCUPA MEMÓRIA E NÃO TEM TIPO
+// Reserva_Troco --> VALOR MÍNIMO QUE PRECISA FICAR NO CAIXA DEPOIS DE UMA SANGRIA
+// Capacidade_Inicial --> QUANTAS POSIÇÕES CADA VETOR DINÂMICO TEM NO COMEÇO ( A FUNÇÃO Expandir USA ISSO NO PRIMEIRO realloc )
+// Tamanho_Linha --> TAMANHO DOS BUFFERS ( char Buffer[Tamanho_Linha] ) USADOS PARA LER TEXTO DO TECLADO E DOS ARQUIVOS
+// Arquivo_Clientes / Arquivo_Produtos / Arquivo_Vendas / Arquivo_Pagamentos --> NOMES DOS ARQUIVOS DE TEXTO.
+//     EM VEZ DE ESCREVER "clientes.txt" EM VÁRIOS LUGARES ( GRAVAR E CARREGAR ) USA-SE O NOME DA CONSTANTE, EVITANDO ERRO DE DIGITAÇÃO
+// enum --> CRIA NOMES PARA NÚMEROS INTEIROS, DEIXANDO O CÓDIGO MAIS LEGÍVEL.
+//     COMEÇA EM 1 PORQUE O MENU DE CATEGORIA USA 1, 2 E 3
+// static const char Nomes_Categoria[4][20] --> MATRIZ DE CARACTERES: 4 LINHAS, CADA UMA COM ATÉ 20 CARACTERES ( UM VETOR DE 4 STRINGS )
+//     O ÍNDICE É O CÓDIGO DA CATEGORIA. A POSIÇÃO 0 FICA VAZIA, POIS NÃO EXISTE CATEGORIA 0
+//     EXEMPLO DE USO: Nomes_Categoria[2] --> "Material de Limpeza"
+// const --> O CONTEÚDO NÃO PODE SER MODIFICADO DEPOIS
+// static --> A VARIÁVEL FICA VISÍVEL APENAS DENTRO DESTE ARQUIVO .c
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE CONSTANTES ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DAS CONSTANTES ------|
+
+#define Reserva_Troco       50.00   // --> MÍNIMO QUE DEVERÁ PERMANECER NO CAIXA
+#define Capacidade_Inicial  4       // --> TAMANHO INICIAL DOS VETORES DINÂMICOS
+#define Tamanho_Linha       512     // --> TAMANHO DO BUFFER DE LEITURA
+#define Arquivo_Clientes    "clientes.txt"
+#define Arquivo_Produtos    "produtos.txt"
+#define Arquivo_Vendas      "vendas.txt"
+#define Arquivo_Pagamentos  "pagamentos.txt"
+
+enum { Categoria_Alimentos = 1, Categoria_Limpeza = 2, Categoria_Panificacao = 3 };
+
+static const char Nomes_Categoria[4][20] =
+{
+    "", "Alimentos", "Material de Limpeza", "Panificacao"
+};
+
+// |------ FIM DAS CONSTANTES ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE ( typedef struct ( ESTRUTURA )) ------|
+
+// UMA struct AGRUPA VÁRIOS CAMPOS DE TIPOS DIFERENTES EM UM ÚNICO "PACOTE".
+// ELA NÃO PEDE NADA AO USUÁRIO, SÓ GUARDA OS DADOS. QUEM PEDE OS DADOS SÃO AS FUNÇÕES DE CADASTRO
+// O ( typedef ) DÁ UM NOME CURTO AO TIPO: ESCREVE-SE ( Cliente ) EM VEZ DE ( struct Cliente )
+
+// Cliente      --> GUARDA CÓDIGO / NOME / NOME SOCIAL / CPF / RUA E NÚMERO / BAIRRO / CELULAR DE UM CLIENTE
+// Produto      --> GUARDA CÓDIGO / DESCRIÇÃO / CATEGORIA / PREÇO DE COMPRA / MARGEM DE LUCRO / ESTOQUE / ESTOQUE MÍNIMO / ATIVO
+//                  ( Ativo = 1 PRODUTO NORMAL, Ativo = 0 PRODUTO DESCONTINUADO )
+// Item_Venda   --> UMA LINHA DO CARRINHO: CÓDIGO / DESCRIÇÃO / PREÇO DE VENDA / QUANTIDADE / TOTAL
+//                  A DESCRIÇÃO E O PREÇO SÃO COPIADOS NA HORA DA VENDA, ASSIM MUDAR O CADASTRO DEPOIS NÃO ALTERA VENDAS ANTIGAS
+// Venda        --> UMA VENDA COMPLETA: NÚMERO / VETOR DINÂMICO DE ITENS ( Itens ) / QUANTIDADE E CAPACIDADE DE ITENS /
+//                  SUBTOTAL / PERCENTUAL DE DESCONTO / TOTAL COM DESCONTO / SITUAÇÃO ( 'a' = ABERTA, 'p' = PAGA )
+// Pagamento    --> LIGADO A UMA VENDA PELO NÚMERO: VALOR PAGO / TIPO ( "d", "c" OU "dc" ) / PARTE EM DINHEIRO ( SEM O TROCO ) / PARTE EM CARTÃO
+// Resumo_Caixa --> RESULTADO CALCULADO NO FECHAMENTO: QUANTIDADE DE VENDAS / FATURAMENTO / TOTAL PAGO EM DINHEIRO /
+//                  TOTAL PAGO EM CARTÃO / TOTAL PAGO MISTO / CONFERÊNCIA ( RESULTADO DA CONCILIAÇÃO ). NÃO É GRAVADO EM ARQUIVO
+// Sistema      --> GUARDA O ESTADO COMPLETO DO PROGRAMA: OS QUATRO VETORES DINÂMICOS E OS DADOS DO CAIXA.
+//                  CADA VETOR TEM SEMPRE TRÊS CAMPOS: PONTEIRO / QUANTIDADE USADA / CAPACIDADE ALOCADA.
+//                  É CRIADA UMA ÚNICA VEZ NO main E PASSADA POR PONTEIRO ( Sistema *Sis ) PARA AS FUNÇÕES, POR ISSO NÃO EXISTEM VARIÁVEIS GLOBAIS
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE ( typedef struct ( ESTRUTURA )) ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DAS ESTRUTURAS ------|
+
+typedef struct
+{
+    int  Codigo;
+    char Nome[100];
+    char NomeSocial[100];
+    char Cpf[15];               // --> FORMATO 000.000.000-00
+    char Rua_e_Numero[100];
+    char Bairro[50];
+    char Celular[20];
+} Cliente;
+
+typedef struct
+{
+    int    Codigo;
+    char   Descricao[50];
+    int    Categoria;           // --> 1 ALIMENTOS, 2 LIMPEZA, 3 PANIFICACAO
+    double Preco_Compra;        // --> QUANTO A LOJA PAGA PELO PRODUTO
+    double Margem_Lucro;        // --> PERCENTUAL
+    int    Estoque;             // --> UNIDADES DISPONÍVEIS AGORA
+    int    Estoque_Minimo;      // --> IGUAL OU ABAIXO DISSO GERA ALERTA
+    int    Ativo;               // --> 0 = DESCONTINUADO
+} Produto;
+
+typedef struct
+{
+    int    Codigo;
+    char   Descricao[50];       // --> COPIADA DO CADASTRO NO MOMENTO DA VENDA
+    double Preco_Venda;         // --> PREÇO CALCULADO E CONGELADO NA VENDA
+    int    Quantidade;
+    double Total;               // --> Preco_Venda * Quantidade
+} Item_Venda;
+
+typedef struct
+{
+    int         Numero;
+    Item_Venda *Itens;          // --> CARRINHO DINÂMICO ( PONTEIRO )
+    int         Quantidade_Itens;
+    int         Capacidade_Itens;
+    double      SubTotal;       // --> TOTALIZADOR DO CARRINHO
+    double      Percentual_Desconto;
+    double      Total;          // --> SUBTOTAL JÁ COM DESCONTO
+    char        Situacao;       // --> 'a' = ABERTA, 'p' = PAGA
+} Venda;
+
+typedef struct
+{
+    int    Numero_Venda;
+    double Valor_Pago;
+    char   Tipo[3];             // --> "d", "c" OU "dc" ( 2 LETRAS + '\0' )
+    double Valor_Dinheiro;      // --> PARTE PAGA EM DINHEIRO ( SEM O TROCO )
+    double Valor_Cartao;        // --> PARTE PAGA EM CARTÃO
+} Pagamento;
+
+typedef struct
+{
+    int    Quantidade_Vendas;
+    double Faturamento;
+    double Pago_Dinheiro;
+    double Pago_Cartao;
+    double Pago_Dinheiro_e_Cartao;
+    double Conferencia;
+} Resumo_Caixa;
+
+typedef struct
+{
+    Cliente   *clientes;    int Quantidade_Clientes;    int Capacidade_Clientes;
+    Produto   *produtos;    int Quantidade_Produtos;    int Capacidade_Produtos;
+    Venda     *vendas;      int Quantidade_Vendas;      int Capacidade_Vendas;
+    Pagamento *pagamentos;  int Quantidade_Pagamentos;  int Capacidade_Pagamentos;
+
+    int    Caixa_Aberto;        // --> 1 = ABERTO, 0 = FECHADO
+    double Valor_Abertura;      // --> FUNDO DE TROCO INFORMADO NA ABERTURA
+    double Total_Sangrias;      // --> SOMA DAS RETIRADAS DO CAIXA ATUAL
+    int    Inicio_Pagamentos;   // --> PRIMEIRO PAGAMENTO DO CAIXA ATUAL
+    double Ajuste;              // --> + SOBRA, - FALTA, 0 CORRETO
+} Sistema;
+
+// |------ FIM DAS ESTRUTURAS ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE UTILITARIOS UTILIZADOS ------|
+
+// Limpar_Tela --> LIMPA O TERMINAL. O ( #ifdef _WIN32 ) É UMA COMPILAÇÃO CONDICIONAL: SE ESTIVER COMPILANDO NO WINDOWS USA O COMANDO ( cls ),
+//                 NOS OUTROS SISTEMAS ( LINUX, MAC ) USA ( clear ). SÓ UMA DAS DUAS LINHAS ENTRA NO PROGRAMA FINAL
+//
+// Ler_Linha --> É A FUNÇÃO BASE DE LEITURA, TODAS AS OUTRAS LEITURAS PASSAM POR ELA
+//     ( fgets ) LÊ UMA LINHA DO TECLADO ( stdin ) COM NO MÁXIMO ( Tamanho - 1 ) CARACTERES. É MAIS SEGURA QUE ( scanf ) E ( gets ) POIS NÃO ESTOURA O BUFFER
+//     SE RETORNAR ( NULL ) A ENTRADA ACABOU E O PROGRAMA ENCERRA
+//     ( fgets ) GUARDA O ( \n ) DO ENTER NO TEXTO. O ( strcspn( Destino, "\r\n" ) ) ENCONTRA A POSIÇÃO DO PRIMEIRO ( \r ) OU ( \n )
+//     E O CÓDIGO COLOCA ( '\0' ) ALI, CORTANDO A QUEBRA DE LINHA
+//     ATENÇÃO: NÃO PODE TER ESPAÇO DENTRO DE "\r\n", SENÃO O TEXTO SERIA CORTADO NO PRIMEIRO ESPAÇO
+//
+// Pausar --> MOSTRA "Pressione ENTER para continuar..." E ESPERA O ENTER COM ( fgets ).
+//     SERVE PARA O USUÁRIO CONSEGUIR LER A MENSAGEM ANTES DE O MENU LIMPAR A TELA
+//
+// Arredondar2 --> ARREDONDA PARA 2 CASAS DECIMAIS. PASSO A PASSO COM ( Valor = 7.456 ):
+//     1° 7.456 * 100 = 745.6  /  2° + 0.5 = 746.1  /  3° ( long ) DESCARTA A PARTE DECIMAL = 746  /  4° 746 / 100.0 = 7.46
+//     ISSO É IMPORTANTE PARA DINHEIRO, PARA EVITAR RESULTADOS COMO 7.4600000001
+//     O ( long ) TRUNCA EM DIREÇÃO AO ZERO, ENTÃO PARA NEGATIVOS A FUNÇÃO ARREDONDA O VALOR POSITIVO E DEPOIS TROCA O SINAL
+//
+// Ler_Texto --> LÊ UM TEXTO OBRIGATÓRIO. MOSTRA A MENSAGEM E LÊ PARA UM ( Buffer ) GRANDE
+//     TROCA TODO ( | ) POR ( - ) PORQUE ( | ) É O SEPARADOR DOS CAMPOS NOS ARQUIVOS ( .txt ) E QUEBRARIA A LEITURA DEPOIS
+//     SE FICOU VAZIO AVISA "Campo obrigatorio!" E REPETE ( continue ). SE ESTÁ OK COPIA PARA O ( Destino ) COM ( strncpy ) RESPEITANDO O TAMANHO E GARANTE O '\0'
+//     REPARE QUE LÊ PRIMEIRO NUM BUFFER DE 512 E DEPOIS COPIA PARA O CAMPO MENOR: SE O USUÁRIO DIGITAR DEMAIS O TEXTO É CORTADO EM VEZ DE ESTOURAR A MEMÓRIA
+//
+// Ler_Int --> LÊ UM NÚMERO INTEIRO REPETINDO ATÉ O USUÁRIO DIGITAR ALGO VÁLIDO
+//     ( strtol ) CONVERTE TEXTO EM NÚMERO E, PELO PONTEIRO ( Fim ), INFORMA ONDE PAROU DE CONVERTER
+//     ( Fim != Buffer ) --> PELO MENOS UM DÍGITO FOI CONVERTIDO ( NÃO DIGITOU SÓ LETRA )
+//     ( *Fim == '\0' ) --> CHEGOU AO FIM DO TEXTO SEM SOBRAR LIXO ( "12abc" É RECUSADO )
+//     É MUITO MELHOR QUE ( scanf("%d") ), QUE TRAVA OU DEIXA LIXO NO BUFFER QUANDO O USUÁRIO DIGITA LETRAS
+//
+// Ler_Double --> IGUAL AO ( Ler_Int ) MAS PARA NÚMEROS DECIMAIS, COM ( strtod ).
+//     A DIFERENÇA É QUE ANTES ELE TROCA VÍRGULA POR PONTO, PORQUE NO BRASIL SE DIGITA 7,50 MAS A LINGUAGEM C SÓ ENTENDE 7.50
+//
+// Confirmar --> FAZ UMA PERGUNTA DE SIM OU NÃO. MOSTRA ( Mensagem ( s/n ) ) E OLHA SÓ O PRIMEIRO CARACTERE DIGITADO, EM MINÚSCULO ( tolower ).
+//     ( s ) RETORNA 1 ( VERDADEIRO ), ( n ) RETORNA 0 ( FALSO ). QUALQUER OUTRA COISA AVISA E PERGUNTA NOVAMENTE
+//
+// Expandir --> É A FUNÇÃO MAIS IMPORTANTE DO PROGRAMA. ELA AUMENTA QUALQUER VETOR DINÂMICO QUANDO ELE ENCHE
+//     ( void *Vetor ) --> PONTEIRO GENÉRICO, SERVE PARA QUALQUER TIPO ( CLIENTES / PRODUTOS / VENDAS / ETC )
+//     ( int *Capacidade ) --> RECEBIDO POR PONTEIRO PARA A FUNÇÃO PODER ALTERAR A CAPACIDADE ORIGINAL
+//     ( Quantidade ) --> QUANTOS ELEMENTOS JÁ EXISTEM
+//     ( Tamanho ) --> TAMANHO DE CADA ELEMENTO, POR EXEMPLO sizeof( Cliente )
+//     O FLUXO: SE ( Quantidade < *Capacidade ) AINDA TEM ESPAÇO E DEVOLVE O VETOR SEM MEXER.
+//     SENÃO CALCULA A NOVA CAPACIDADE ( 4 SE ESTAVA EM 0, OU O DOBRO ). ( realloc ) AUMENTA O BLOCO DE MEMÓRIA E COPIA OS DADOS ANTIGOS SE PRECISAR MOVER.
+//     SE ( realloc ) FALHAR ( NULL ) MOSTRA O ERRO E ENCERRA. ATUALIZA A ( *Capacidade ) E DEVOLVE O NOVO ENDEREÇO
+//     USO: Sis->clientes = Expandir( Sis->clientes, &Sis->Capacidade_Clientes, Sis->Quantidade_Clientes, sizeof( Cliente ) );
+//     O ( realloc ) PODE MUDAR O ENDEREÇO DO VETOR, ENTÃO É PRECISO GUARDAR O RETORNO.
+//     QUANDO O PONTEIRO COMEÇA EM ( NULL ), O ( realloc ) FUNCIONA COMO UM ( malloc )
+//
+// Imprimir_Titulo --> DESENHA UMA MOLDURA EM VOLTA DO TÍTULO. O ( %-51s ) RESERVA 51 CARACTERES PARA O TEXTO ALINHADO À ESQUERDA ( O - ),
+//     ASSIM O || FINAL FICA SEMPRE NA MESMA COLUNA, QUALQUER QUE SEJA O TAMANHO DO TÍTULO
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE UTILITARIOS UTILIZADOS ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DOS UTILITARIOS ------|
+
+void Limpar_Tela(void)
+{
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+
+void Ler_Linha(char *Destino, int Tamanho)
+{
+    if (fgets(Destino, Tamanho, stdin) == NULL)
+    {
+        printf("\nEntrada encerrada!\n");
+        exit(0);
+    }
+    Destino[strcspn(Destino, "\r\n")] = '\0';   // --> REMOVE A QUEBRA DE LINHA ( SEM ESPAÇO NO CONJUNTO )
+}
+
+void Pausar(void)
+{
+    char Buffer[Tamanho_Linha];
+
+    printf("\nPressione ENTER para continuar...");
+    if (fgets(Buffer, sizeof Buffer, stdin) == NULL)
+    {
+        return;
+    }
+}
+
+double Arredondar2(double Valor)
+{
+    if (Valor < 0)
+    {
+        return -Arredondar2(-Valor);   // --> NEGATIVO: ARREDONDA O POSITIVO E INVERTE O SINAL
+    }
+
+    return (double)((long)(Valor * 100.0 + 0.5)) / 100.0;
+}
+
+void Ler_Texto(const char *Mensagem, char *Destino, int Tamanho)
+{
+    char Buffer[Tamanho_Linha];
+
+    while (1)
+    {
+        printf("%s", Mensagem);
+        Ler_Linha(Buffer, sizeof Buffer);
+
+        for (size_t i = 0; Buffer[i] != '\0'; i++)
+        {
+            if (Buffer[i] == '|')
+            {
+                Buffer[i] = '-';       // --> '|' SEPARA OS CAMPOS NOS ARQUIVOS
+            }
+        }
+
+        if (strlen(Buffer) == 0)
+        {
+            printf("Campo obrigatorio!\n");
+            continue;
+        }
+
+        strncpy(Destino, Buffer, Tamanho - 1);
+        Destino[Tamanho - 1] = '\0';   // --> GARANTE O FIM DA STRING
+        return;
+    }
+}
+
+int Ler_Int(const char *Mensagem)
+{
+    char  Buffer[Tamanho_Linha];
+    char *Fim;
+    long  Valor;
+
+    while (1)
+    {
+        printf("%s", Mensagem);
+        Ler_Linha(Buffer, sizeof Buffer);
+
+        Valor = strtol(Buffer, &Fim, 10);
+
+        while (*Fim == ' ')
+        {
+            Fim++;                     // --> IGNORA ESPAÇOS NO FINAL
+        }
+
+        if (Fim != Buffer && *Fim == '\0')
+        {
+            return (int)Valor;
+        }
+
+        printf("Valor invalido! Digite um numero inteiro.\n");
+    }
+}
+
+double Ler_Double(const char *Mensagem)
+{
+    char   Buffer[Tamanho_Linha];
+    char  *Fim;
+    double Valor;
+
+    while (1)
+    {
+        printf("%s", Mensagem);
+        Ler_Linha(Buffer, sizeof Buffer);
+
+        for (size_t i = 0; Buffer[i] != '\0'; i++)
+        {
+            if (Buffer[i] == ',')
+            {
+                Buffer[i] = '.';       // --> ACEITA VÍRGULA COMO SEPARADOR DECIMAL
+            }
+        }
+
+        Valor = strtod(Buffer, &Fim);
+
+        while (*Fim == ' ')
+        {
+            Fim++;
+        }
+
+        if (Fim != Buffer && *Fim == '\0')
+        {
+            return Valor;
+        }
+
+        printf("Valor invalido! Digite um numero.\n");
+    }
+}
+
+int Confirmar(const char *Mensagem)
+{
+    char Buffer[Tamanho_Linha];
+
+    while (1)
+    {
+        printf("%s (s/n): ", Mensagem);
+        Ler_Linha(Buffer, sizeof Buffer);
+
+        if (tolower((unsigned char)Buffer[0]) == 's') return 1;
+        if (tolower((unsigned char)Buffer[0]) == 'n') return 0;
+
+        printf("Responda com s ou n.\n");
+    }
+}
+
+void *Expandir(void *Vetor, int *Capacidade, int Quantidade, size_t Tamanho)
+{
+    int   Nova_Capacidade;
+    void *Novo;
+
+    if (Quantidade < *Capacidade)
+    {
+        return Vetor;                  // --> AINDA TEM ESPAÇO
+    }
+
+    Nova_Capacidade = (*Capacidade == 0) ? Capacidade_Inicial : *Capacidade * 2;
+    Novo = realloc(Vetor, (size_t)Nova_Capacidade * Tamanho);
+
+    if (Novo == NULL)
+    {
+        printf("Erro: memoria insuficiente!\n");
+        exit(1);
+    }
+
+    *Capacidade = Nova_Capacidade;
+    return Novo;
+}
+
+void Imprimir_Titulo(const char *Titulo)
+{
+    printf("\n||=====================================================||\n");
+    printf("|| %-51s ||\n", Titulo);
+    printf("||=====================================================||\n");
+}
+
+// |------ FIM DOS UTILITARIOS ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE CLIENTES ------|
+
+// Ler_Cpf --> LÊ UM CPF COM 11 DÍGITOS E O GRAVA FORMATADO
+//     USA ( Ler_Texto ) PARA PEGAR O QUE FOI DIGITADO E COPIA SÓ OS DÍGITOS ( isdigit ) PARA ( Digitos ), IGNORANDO PONTOS, TRAÇOS E ESPAÇOS
+//     O ( Qtd < 11 ) EVITA ESTOURAR O VETOR SE DIGITAREM MAIS QUE 11 NÚMEROS
+//     COM 11 DÍGITOS, ( sprintf ) MONTA O TEXTO FORMATADO. O ( %.3s ) IMPRIME NO MÁXIMO 3 CARACTERES DA STRING,
+//     ENTÃO "12345678901" VIRA "123.456.789-01". ( Digitos + 3 ) É O ENDEREÇO DO QUARTO CARACTERE, E ASSIM POR DIANTE
+//     NÃO CONFERE OS DÍGITOS VERIFICADORES, SÓ A QUANTIDADE
+//
+// Cadastrar_Cliente --> CADASTRA UM NOVO CLIENTE NO FIM DO VETOR
+//     1° ( Expandir ) GARANTE ESPAÇO PARA MAIS UM  /  2° ( C ) APONTA PARA A PRÓXIMA POSIÇÃO LIVRE E O CÓDIGO É SEQUENCIAL ( QUANTIDADE + 1 )
+//     3° PEDE CADA CAMPO COM ( Ler_Texto ) E ( Ler_Cpf )  /  4° SÓ NO FINAL FAZ ( Quantidade_Clientes++ ), ASSIM O CLIENTE SÓ É CONTADO DEPOIS DE PREENCHIDO
+//
+// Relatorio_Clientes --> LISTA TODOS OS CLIENTES. O ( const ) NO PARÂMETRO GARANTE QUE A FUNÇÃO SÓ LÊ, NÃO ALTERA O SISTEMA
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE CLIENTES ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DE CLIENTES ------|
+
+void Ler_Cpf(char *Destino)
+{
+    char Buffer[Tamanho_Linha];
+    char Digitos[12];                  // --> 11 DÍGITOS + '\0'
+    int  Qtd;
+
+    while (1)
+    {
+        Ler_Texto("CPF (11 digitos): ", Buffer, sizeof Buffer);
+
+        Qtd = 0;
+        for (size_t i = 0; Buffer[i] != '\0'; i++)
+        {
+            if (isdigit((unsigned char)Buffer[i]) && Qtd < 11)
+            {
+                Digitos[Qtd++] = Buffer[i];
+            }
+        }
+        Digitos[Qtd] = '\0';
+
+        if (Qtd == 11)
+        {
+            sprintf(Destino, "%.3s.%.3s.%.3s-%.2s",
+                    Digitos, Digitos + 3, Digitos + 6, Digitos + 9);
+            return;
+        }
+
+        printf("CPF invalido! Informe 11 digitos.\n");
+    }
+}
+
+void Cadastrar_Cliente(Sistema *Sis)
+{
+    Cliente *C;
+
+    Sis->clientes = Expandir(Sis->clientes, &Sis->Capacidade_Clientes,
+                             Sis->Quantidade_Clientes, sizeof(Cliente));
+
+    C = &Sis->clientes[Sis->Quantidade_Clientes];
+    C->Codigo = Sis->Quantidade_Clientes + 1;
+
+    Imprimir_Titulo("CADASTRO DE CLIENTE");
+    printf("Codigo do cliente: %d\n", C->Codigo);
+
+    Ler_Texto("Nome completo: ", C->Nome, sizeof C->Nome);
+    Ler_Texto("Nome social (repita o nome se nao houver): ",
+              C->NomeSocial, sizeof C->NomeSocial);
+    Ler_Cpf(C->Cpf);
+    Ler_Texto("Rua e numero: ", C->Rua_e_Numero, sizeof C->Rua_e_Numero);
+    Ler_Texto("Bairro: ", C->Bairro, sizeof C->Bairro);
+    Ler_Texto("Celular/WhatsApp: ", C->Celular, sizeof C->Celular);
+
+    Sis->Quantidade_Clientes++;        // --> SÓ CONTA DEPOIS DE PREENCHER TUDO
+
+    printf("\nCliente cadastrado com sucesso!\n");
+    Pausar();
+}
+
+void Relatorio_Clientes(const Sistema *Sis)
+{
+    Imprimir_Titulo("LISTAGEM DOS CLIENTES");
+
+    if (Sis->Quantidade_Clientes == 0)
+    {
+        printf("Nenhum cliente cadastrado.\n");
+        Pausar();
+        return;
+    }
+
+    for (int i = 0; i < Sis->Quantidade_Clientes; i++)
+    {
+        const Cliente *C = &Sis->clientes[i];
+
+        printf("\nCodigo : %d\n", C->Codigo);
+        printf("Nome   : %s (social: %s)\n", C->Nome, C->NomeSocial);
+        printf("CPF    : %s\n", C->Cpf);
+        printf("Endere.: %s - %s\n", C->Rua_e_Numero, C->Bairro);
+        printf("Celular: %s\n", C->Celular);
+    }
+
+    printf("\nTotal de clientes: %d\n", Sis->Quantidade_Clientes);
+    Pausar();
+}
+
+// |------ FIM DE CLIENTES ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE PRODUTOS ------|
+
+// Buscar_Produto --> BUSCA LINEAR: PERCORRE O VETOR DO COMEÇO AO FIM COMPARANDO O CÓDIGO. RETORNA O ÍNDICE ( POSIÇÃO ) OU -1 SE NÃO ACHAR
+//
+// Calcular_Preco_Venda --> PREÇO DE VENDA = COMPRA + MARGEM DE LUCRO. EXEMPLO: COMPRA 7,00 E MARGEM 10% --> 7,00 * 1,10 = 7,70
+//     O PREÇO NÃO É GUARDADO NO PRODUTO, É CALCULADO SEMPRE QUE PRECISA. ASSIM, ALTERAR A MARGEM JÁ VALE PARA AS PRÓXIMAS VENDAS
+//
+// Inserir_Produto --> ADICIONA UM PRODUTO NO VETOR DINÂMICO. É USADA NO CADASTRO E NOS PRODUTOS DE EXEMPLO
+//     ( strncpy ) COPIA A DESCRIÇÃO COM LIMITE E O '\0' MANUAL GARANTE QUE A STRING TERMINE. TODO PRODUTO NOVO NASCE ATIVO
+//
+// Carregar_Produtos_Exemplo --> CATÁLOGO INICIAL ( PREÇOS DE VENDA 7,70 / 2,99 / 12,50 ). SÓ É USADO QUANDO NÃO HÁ PRODUTOS VINDOS DE ARQUIVO
+//
+// Cadastrar_Produto --> PEDE OS DADOS COM VALIDAÇÃO. O CÓDIGO PRECISA SER MAIOR QUE ZERO E AINDA NÃO EXISTIR ( Buscar_Produto DEVE RETORNAR -1 ).
+//     OS ( do / while ) REPETEM A PERGUNTA ENQUANTO O VALOR FOR INVÁLIDO. ( Quantidade_Produtos - 1 ) É O PRODUTO QUE ACABOU DE SER INSERIDO
+//
+// Alterar_Margem --> MUDA SÓ A MARGEM DO PRODUTO. VENDAS ANTIGAS NÃO MUDAM, POIS GUARDAM O PREÇO DE QUANDO FORAM FEITAS
+//
+// Descontinuar_Produto --> MARCA ( Ativo = 0 ). O PRODUTO NÃO É APAGADO PARA MANTER O HISTÓRICO. DEPOIS DISSO NÃO PODE MAIS SER VENDIDO
+//
+// Mostrar_Catalogo_Venda --> MOSTRA SÓ OS PRODUTOS ATIVOS ANTES DE INICIAR UMA VENDA ( RF06 )
+//
+// Relatorio_Produtos --> LISTA TODOS ( INCLUSIVE DESCONTINUADOS ) E AVISA QUANDO O ESTOQUE ESTÁ NO MÍNIMO OU ABAIXO
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE PRODUTOS ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DE PRODUTOS ------|
+
+int Buscar_Produto(const Sistema *Sis, int Codigo)
+{
+    for (int i = 0; i < Sis->Quantidade_Produtos; i++)
+    {
+        if (Sis->produtos[i].Codigo == Codigo)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+double Calcular_Preco_Venda(const Produto *P)
+{
+    return Arredondar2(P->Preco_Compra * (1.0 + P->Margem_Lucro / 100.0));
+}
+
+void Inserir_Produto(Sistema *Sis, int Codigo, const char *Descricao,
+                     int Categoria, double Compra, double Margem,
+                     int Estoque, int Minimo)
+{
+    Produto *P;
+
+    Sis->produtos = Expandir(Sis->produtos, &Sis->Capacidade_Produtos,
+                             Sis->Quantidade_Produtos, sizeof(Produto));
+
+    P = &Sis->produtos[Sis->Quantidade_Produtos];
+    P->Codigo         = Codigo;
+    strncpy(P->Descricao, Descricao, sizeof P->Descricao - 1);
+    P->Descricao[sizeof P->Descricao - 1] = '\0';
+    P->Categoria      = Categoria;
+    P->Preco_Compra   = Compra;
+    P->Margem_Lucro   = Margem;
+    P->Estoque        = Estoque;
+    P->Estoque_Minimo = Minimo;
+    P->Ativo          = 1;             // --> TODO PRODUTO NOVO NASCE ATIVO
+
+    Sis->Quantidade_Produtos++;
+}
+
+void Carregar_Produtos_Exemplo(Sistema *Sis)
+{
+    Inserir_Produto(Sis, 1000, "Cafe",          Categoria_Alimentos,    7.00, 10.0, 10, 3);
+    Inserir_Produto(Sis, 1001, "Esponja",       Categoria_Limpeza,      2.30, 30.0, 30, 5);
+    Inserir_Produto(Sis, 1002, "Biscoito doce", Categoria_Panificacao, 10.00, 25.0,  5, 5);
+}
+
+void Cadastrar_Produto(Sistema *Sis)
+{
+    int    Codigo, Categoria, Estoque, Minimo;
+    double Compra, Margem;
+    char   Descricao[50];
+
+    Imprimir_Titulo("CADASTRO DE PRODUTO");
+
+    while (1)
+    {
+        Codigo = Ler_Int("Codigo do produto: ");
+
+        if (Codigo <= 0)
+        {
+            printf("O codigo deve ser maior que zero!\n");
+        }
+        else if (Buscar_Produto(Sis, Codigo) != -1)
+        {
+            printf("Ja existe um produto com esse codigo!\n");
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    Ler_Texto("Descricao: ", Descricao, sizeof Descricao);
+
+    do
+    {
+        Categoria = Ler_Int("Categoria (1-Alimentos 2-Material de Limpeza 3-Panificacao): ");
+    } while (Categoria < 1 || Categoria > 3);
+
+    do
+    {
+        Compra = Ler_Double("Preco de compra: R$ ");
+    } while (Compra <= 0);
+
+    do
+    {
+        Margem = Ler_Double("Margem de lucro (%): ");
+    } while (Margem < 0);
+
+    do
+    {
+        Estoque = Ler_Int("Quantidade em estoque: ");
+    } while (Estoque < 0);
+
+    do
+    {
+        Minimo = Ler_Int("Estoque minimo: ");
+    } while (Minimo < 0);
+
+    Inserir_Produto(Sis, Codigo, Descricao, Categoria, Compra, Margem, Estoque, Minimo);
+
+    printf("\nProduto cadastrado! Preco de venda atual: R$ %.2f\n",
+           Calcular_Preco_Venda(&Sis->produtos[Sis->Quantidade_Produtos - 1]));
+    Pausar();
+}
+
+void Alterar_Margem(Sistema *Sis)
+{
+    int      Indice;
+    double   Margem;
+    Produto *P;
+
+    Imprimir_Titulo("ALTERAR MARGEM DE LUCRO");
+
+    Indice = Buscar_Produto(Sis, Ler_Int("Codigo do produto: "));
+
+    if (Indice == -1)
+    {
+        printf("Produto nao encontrado!\n");
+        Pausar();
+        return;
+    }
+
+    P = &Sis->produtos[Indice];
+    printf("%s - margem atual: %.2f%% - preco de venda: R$ %.2f\n",
+           P->Descricao, P->Margem_Lucro, Calcular_Preco_Venda(P));
+
+    do
+    {
+        Margem = Ler_Double("Nova margem (%): ");
+    } while (Margem < 0);
+
+    P->Margem_Lucro = Margem;
+    printf("Novo preco de venda: R$ %.2f\n", Calcular_Preco_Venda(P));
+    Pausar();
+}
+
+void Descontinuar_Produto(Sistema *Sis)
+{
+    int Indice;
+
+    Imprimir_Titulo("DESCONTINUAR PRODUTO");
+
+    Indice = Buscar_Produto(Sis, Ler_Int("Codigo do produto: "));
+
+    if (Indice == -1)
+    {
+        printf("Produto nao encontrado!\n");
+    }
+    else if (!Sis->produtos[Indice].Ativo)
+    {
+        printf("Este produto ja esta descontinuado.\n");
+    }
+    else if (Confirmar("Confirma a descontinuacao?"))
+    {
+        Sis->produtos[Indice].Ativo = 0;
+        printf("Produto descontinuado (continua no historico das vendas).\n");
+    }
+
+    Pausar();
+}
+
+void Mostrar_Catalogo_Venda(const Sistema *Sis)
+{
+    Imprimir_Titulo("PRODUTOS DISPONIVEIS");
+    printf("%-8s %-22s %-20s %-12s %-8s\n",
+           "CODIGO", "DESCRICAO", "CATEGORIA", "PRECO VENDA", "ESTOQUE");
+
+    for (int i = 0; i < Sis->Quantidade_Produtos; i++)
+    {
+        const Produto *P = &Sis->produtos[i];
+
+        if (P->Ativo)
+        {
+            printf("%-8d %-22s %-20s R$ %-9.2f %-8d\n",
+                   P->Codigo, P->Descricao, Nomes_Categoria[P->Categoria],
+                   Calcular_Preco_Venda(P), P->Estoque);
+        }
+    }
+}
+
+void Relatorio_Produtos(const Sistema *Sis)
+{
+    Imprimir_Titulo("LISTAGEM DOS PRODUTOS");
+
+    if (Sis->Quantidade_Produtos == 0)
+    {
+        printf("Nenhum produto cadastrado.\n");
+        Pausar();
+        return;
+    }
+
+    printf("%-7s %-20s %-19s %-9s %-7s %-9s %-5s %-4s %s\n",
+           "CODIGO", "DESCRICAO", "CATEGORIA", "COMPRA", "MARGEM",
+           "VENDA", "ESTOQ", "MIN", "SITUACAO");
+
+    for (int i = 0; i < Sis->Quantidade_Produtos; i++)
+    {
+        const Produto *P = &Sis->produtos[i];
+
+        printf("%-7d %-20s %-19s R$%-7.2f %-6.1f%% R$%-7.2f %-5d %-4d %s\n",
+               P->Codigo, P->Descricao, Nomes_Categoria[P->Categoria],
+               P->Preco_Compra, P->Margem_Lucro, Calcular_Preco_Venda(P),
+               P->Estoque, P->Estoque_Minimo,
+               P->Ativo ? "Ativo" : "Descontinuado");
+
+        if (P->Ativo && P->Estoque <= P->Estoque_Minimo)
+        {
+            printf("        >> ATENCAO: estoque no minimo ou abaixo!\n");
+        }
+    }
+
+    Pausar();
+}
+
+// |------ FIM DE PRODUTOS ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE CAIXA ------|
+
+// Saldo_Dinheiro --> DINHEIRO FISICAMENTE NA GAVETA = ABERTURA - SANGRIAS + DINHEIRO RECEBIDO NOS PAGAMENTOS
+//     O LAÇO COMEÇA EM ( Inicio_Pagamentos ), ENTÃO SÓ CONTA OS PAGAMENTOS DO CAIXA ATUAL E IGNORA OS DE CAIXAS ANTERIORES
+//     USA ( Valor_Dinheiro ) E NÃO ( Valor_Pago ), POIS O TROCO VOLTA PARA O CLIENTE E NÃO FICA NA GAVETA
+//
+// Verificar_Caixa_Aberto --> GUARDA USADA NO INÍCIO DAS OPERAÇÕES QUE EXIGEM CAIXA ABERTO. RETORNA 1 SE ESTÁ ABERTO, SENÃO AVISA E RETORNA 0
+//
+// Abrir_Caixa --> RECUSA SE JÁ ESTIVER ABERTO. PEDE O VALOR DE ABERTURA ( FUNDO DE TROCO ) E REPETE ENQUANTO FOR NEGATIVO.
+//     ZERA SANGRIAS E AJUSTE. ( Inicio_Pagamentos = Quantidade_Pagamentos ) MARCA ONDE COMEÇAM OS PAGAMENTOS DESTE CAIXA
+//     ( TUDO QUE JÁ EXISTE FICA DE FORA DOS CÁLCULOS ). POR FIM ( Caixa_Aberto = 1 )
+//
+// Retirada_Caixa ( SANGRIA ) --> RETIRA DINHEIRO PRESERVANDO SEMPRE ( Reserva_Troco ) NO CAIXA
+//     O VALOR 0.004 É UMA TOLERÂNCIA PARA ERROS DE PONTO FLUTUANTE ( MEIO CENTAVO ), PARA NÃO LIBERAR RETIRADA DE 0,0000001 POR ARREDONDAMENTO
+//     SE ( Saldo - Reserva ) NÃO FOR POSITIVO, NÃO HÁ O QUE RETIRAR. SENÃO MOSTRA O MÁXIMO E VALIDA: VALOR > 0 E QUE NÃO DEIXE MENOS QUE A RESERVA
+//     A SANGRIA NÃO ALTERA ( Valor_Abertura ): SÓ SOMA EM ( Total_Sangrias ) E A FUNÇÃO ( Saldo_Dinheiro ) JÁ DESCONTA ESSE TOTAL
+//
+// Buscar_Venda --> BUSCA LINEAR PELO NÚMERO DA VENDA. RETORNA O ÍNDICE OU -1. ATENÇÃO: NÚMERO DA VENDA É DIFERENTE DO ÍNDICE ( Numero = Indice + 1 )
+//
+// Calcular_Resumo --> PERCORRE OS PAGAMENTOS DO CAIXA ATUAL E MONTA O RESUMO
+//     ( memset ) ZERA TODOS OS CAMPOS ANTES DE ACUMULAR. PARA CADA PAGAMENTO: SOMA O TOTAL DA VENDA NO FATURAMENTO E SEPARA O VALOR PAGO PELO TIPO ( d / c / dc )
+//     CADA VENDA SÓ PODE SER PAGA UMA VEZ ( Registrar_Pagamento MARCA 'p' E Pagar_Venda_Aberta SÓ ACEITA 'a' ), ENTÃO 1 PAGAMENTO = 1 VENDA
+//     CONCILIAÇÃO ( RN07 ) --> Conferencia = Faturamento - Pago_Dinheiro - Pago_Cartao - Pago_Dinheiro_e_Cartao
+//     SE TUDO ESTIVER CERTO O RESULTADO É 0. POSITIVO = SOBRA, NEGATIVO = FALTA
+//     A ABERTURA NÃO ENTRA NA CONTA PORQUE ELA SERIA SOMADA AO FATURAMENTO E LOGO DEPOIS SUBTRAÍDA ( SE CANCELA ), ENTÃO O RESULTADO É O MESMO
+//     NO FINAL, RESULTADO ENTRE -0.005 E 0.005 VIRA 0.0 PARA ELIMINAR RUÍDO DE PONTO FLUTUANTE
+//
+// Fechar_Caixa --> 1° CONFERE SE ESTÁ ABERTO  /  2° AVISA SE EXISTEM VENDAS EM ABERTO ( NÃO ENTRAM NO FATURAMENTO ). ESSA CONTAGEM OLHA TODAS AS VENDAS DO SISTEMA,
+//     POIS UMA VENDA ABERTA DE ANTES CONTINUA PENDENTE  /  3° CALCULA O RESUMO. SE HOUVER DIVERGÊNCIA MOSTRA SOBRA OU FALTA E PERGUNTA SE QUER REGISTRAR O AJUSTE E FECHAR.
+//     SE RESPONDER NÃO O CAIXA CONTINUA ABERTO  /  4° IMPRIME O RESUMO E MARCA ( Caixa_Aberto = 0 )
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE CAIXA ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DE CAIXA ------|
+
+double Saldo_Dinheiro(const Sistema *Sis)
+{
+    double Saldo = Sis->Valor_Abertura - Sis->Total_Sangrias;
+
+    for (int i = Sis->Inicio_Pagamentos; i < Sis->Quantidade_Pagamentos; i++)
+    {
+        Saldo += Sis->pagamentos[i].Valor_Dinheiro;
+    }
+
+    return Saldo;
+}
+
+int Verificar_Caixa_Aberto(const Sistema *Sis)
+{
+    if (!Sis->Caixa_Aberto)
+    {
+        printf("\nO caixa precisa estar aberto!\n");
+        Pausar();
+        return 0;
+    }
+
+    return 1;
+}
+
+void Abrir_Caixa(Sistema *Sis)
+{
+    double Valor;
+
+    Imprimir_Titulo("ABERTURA DE CAIXA");
+
+    if (Sis->Caixa_Aberto)
+    {
+        printf("O caixa ja esta aberto!\n");
+        Pausar();
+        return;
+    }
+
+    do
+    {
+        Valor = Ler_Double("Valor para abertura do caixa: R$ ");
+
+        if (Valor < 0)
+        {
+            printf("Valor invalido! A abertura nao pode ser negativa.\n");
+        }
+    } while (Valor < 0);
+
+    Sis->Valor_Abertura    = Valor;
+    Sis->Total_Sangrias    = 0.0;
+    Sis->Ajuste            = 0.0;
+    Sis->Inicio_Pagamentos = Sis->Quantidade_Pagamentos;   // --> SÓ CONTAM OS PAGAMENTOS NOVOS
+    Sis->Caixa_Aberto      = 1;
+
+    printf("\nCaixa aberto com sucesso! Fundo de troco: R$ %.2f\n", Valor);
+    Pausar();
+}
+
+void Retirada_Caixa(Sistema *Sis)
+{
+    double Saldo, Valor;
+
+    if (!Verificar_Caixa_Aberto(Sis))
+    {
+        return;
+    }
+
+    Imprimir_Titulo("RETIRADA DE CAIXA (SANGRIA)");
+
+    Saldo = Saldo_Dinheiro(Sis);
+    printf("Dinheiro em caixa: R$ %.2f\n", Saldo);
+    printf("Reserva minima para troco: R$ %.2f\n", Reserva_Troco);
+
+    if (Saldo - Reserva_Troco <= 0.004)
+    {
+        printf("\nNao ha valor disponivel para retirada.\n");
+        Pausar();
+        return;
+    }
+
+    printf("Valor maximo para retirada: R$ %.2f\n", Saldo - Reserva_Troco);
+    Valor = Ler_Double("Valor da retirada: R$ ");
+
+    if (Valor <= 0)
+    {
+        printf("\nValor invalido!\n");
+    }
+    else if (Saldo - Valor < Reserva_Troco - 0.004)
+    {
+        printf("\nRetirada bloqueada! Devem permanecer pelo menos R$ %.2f no caixa.\n",
+               Reserva_Troco);
+    }
+    else
+    {
+        Sis->Total_Sangrias += Valor;
+        printf("\nRetirada registrada. Dinheiro restante: R$ %.2f\n",
+               Saldo_Dinheiro(Sis));
+    }
+
+    Pausar();
+}
+
+int Buscar_Venda(const Sistema *Sis, int Numero)
+{
+    for (int i = 0; i < Sis->Quantidade_Vendas; i++)
+    {
+        if (Sis->vendas[i].Numero == Numero)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void Calcular_Resumo(const Sistema *Sis, Resumo_Caixa *R)
+{
+    memset(R, 0, sizeof *R);
+
+    for (int i = Sis->Inicio_Pagamentos; i < Sis->Quantidade_Pagamentos; i++)
+    {
+        const Pagamento *Pg = &Sis->pagamentos[i];
+        int Iv = Buscar_Venda(Sis, Pg->Numero_Venda);
+
+        R->Quantidade_Vendas++;
+
+        if (Iv != -1)
+        {
+            R->Faturamento += Sis->vendas[Iv].Total;
+        }
+
+        if (strcmp(Pg->Tipo, "d") == 0)       R->Pago_Dinheiro          += Pg->Valor_Pago;
+        else if (strcmp(Pg->Tipo, "c") == 0)  R->Pago_Cartao            += Pg->Valor_Pago;
+        else                                  R->Pago_Dinheiro_e_Cartao += Pg->Valor_Pago;
+    }
+
+    // --> CONCILIAÇÃO ( RN07 ). A ABERTURA SE CANCELARIA NA CONTA, POR ISSO NÃO APARECE AQUI
+    R->Conferencia = R->Faturamento - R->Pago_Dinheiro
+                     - R->Pago_Cartao - R->Pago_Dinheiro_e_Cartao;
+
+    if (R->Conferencia > -0.005 && R->Conferencia < 0.005)
+    {
+        R->Conferencia = 0.0;          // --> ELIMINA RUÍDO DE PONTO FLUTUANTE
+    }
+}
+
+void Fechar_Caixa(Sistema *Sis)
+{
+    Resumo_Caixa R;
+    int          Abertas = 0;
+
+    if (!Verificar_Caixa_Aberto(Sis))
+    {
+        return;
+    }
+
+    Imprimir_Titulo("FECHAMENTO DE CAIXA");
+
+    for (int i = 0; i < Sis->Quantidade_Vendas; i++)
+    {
+        if (Sis->vendas[i].Situacao == 'a')
+        {
+            Abertas++;
+        }
+    }
+
+    if (Abertas > 0)
+    {
+        printf("Aviso: existem %d venda(s) em aberto no sistema (nao entram no faturamento).\n\n",
+               Abertas);
+    }
+
+    Calcular_Resumo(Sis, &R);
+
+    if (R.Conferencia != 0.0)
+    {
+        printf("ATENCAO: ha divergencia de valores no caixa!\n");
+        printf("Divergencia: R$ %.2f (%s)\n", R.Conferencia,
+               R.Conferencia > 0 ? "sobra" : "falta");
+
+        if (!Confirmar("Deseja registrar o ajuste e fechar o caixa?"))
+        {
+            printf("\nCaixa mantido aberto.\n");
+            Pausar();
+            return;
+        }
+
+        Sis->Ajuste = R.Conferencia;
+    }
+    else
+    {
+        Sis->Ajuste = 0.0;
+    }
+
+    printf("\n--------------- RESUMO DO FECHAMENTO ---------------\n");
+    printf("Vendas realizadas ............ %d\n", R.Quantidade_Vendas);
+    printf("Faturamento do dia ........... R$ %.2f\n", R.Faturamento);
+    printf("Valor de abertura ............ R$ %.2f\n", Sis->Valor_Abertura);
+    printf("Pago em dinheiro (d) ......... R$ %.2f\n", R.Pago_Dinheiro);
+    printf("Pago em cartao (c) ........... R$ %.2f\n", R.Pago_Cartao);
+    printf("Pago dinheiro+cartao (dc) .... R$ %.2f\n", R.Pago_Dinheiro_e_Cartao);
+    printf("Sangrias realizadas .......... R$ %.2f\n", Sis->Total_Sangrias);
+    printf("Dinheiro final em caixa ...... R$ %.2f\n", Saldo_Dinheiro(Sis));
+    printf("Conferencia .................. R$ %.2f\n", R.Conferencia);
+
+    if (Sis->Ajuste > 0)       printf("Ajuste ....................... R$ %.2f (sobra)\n", Sis->Ajuste);
+    else if (Sis->Ajuste < 0)  printf("Ajuste ....................... R$ %.2f (falta)\n", Sis->Ajuste);
+    else                       printf("Ajuste ....................... nenhum (fechamento correto)\n");
+
+    Sis->Caixa_Aberto = 0;
+    printf("\nCaixa fechado com sucesso!\n");
+    Pausar();
+}
+
+// |------ FIM DE CAIXA ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE VENDAS ------|
+
+// Imprimir_Itens --> IMPRIME A TABELA DE ITENS DE UMA VENDA ( USADA NO RESUMO E NOS RELATÓRIOS )
+//
+// Adicionar_Item --> ADICIONA UM ITEM AO CARRINHO. RETORNA 0 PARA FINALIZAR E 1 PARA CONTINUAR
+//     RECEBE O ÍNDICE DA VENDA ( Iv ) E NÃO UM PONTEIRO, PORQUE O VETOR DE VENDAS PODE SER REALOCADO E UM PONTEIRO ANTIGO FICARIA INVÁLIDO
+//     FLUXO: CÓDIGO 0 FINALIZA  /  PRODUTO INEXISTENTE OU DESCONTINUADO É RECUSADO
+//     RN03 --> ESTOQUE ZERADO: PRODUTO INDISPONÍVEL
+//     RN01 --> ESTOQUE NO MÍNIMO: MOSTRA ALERTA
+//     RN02 --> QUANTIDADE MAIOR QUE O ESTOQUE: OFERECE LEVAR SÓ O QUE TEM DISPONÍVEL
+//     DEPOIS CONGELA O PREÇO DO MOMENTO, EXPANDE O CARRINHO, PREENCHE O ITEM NA PRÓXIMA POSIÇÃO LIVRE, ATUALIZA O SUBTOTAL E SÓ ENTÃO CONTA O ITEM
+//     O ESTOQUE BAIXA NA HORA EM QUE O ITEM ENTRA NO CARRINHO
+//
+// Registrar_Pagamento --> GRAVA O PAGAMENTO NO VETOR E MARCA A VENDA COMO PAGA ( 'p' ) ( RN04 ). RECEBE O TIPO E AS PARTES EM DINHEIRO E CARTÃO
+//
+// Consultar_Maquininha --> SIMULA A MAQUININHA: PERGUNTA 1 ( APROVADO ) OU 0 ( REPROVADO ) E REPETE ATÉ RECEBER UM DOS DOIS
+//
+// Processar_Pagamento --> MOSTRA O MENU DE FORMA DE PAGAMENTO E FICA NELE ATÉ PAGAR ( RETORNA 1 ) OU VOLTAR ( RETORNA 0 )
+//     DINHEIRO: SE O RECEBIDO COBRE O TOTAL, MOSTRA O TROCO E REGISTRA SÓ O TOTAL COMO DINHEIRO ( O TROCO NÃO FICA NO CAIXA ) COM TIPO "d"
+//     DINHEIRO INSUFICIENTE ( RF09 ): OFERECE PAGAR O RESTANTE NO CARTÃO. SE A MAQUININHA APROVAR, REGISTRA PAGAMENTO MISTO "dc"
+//     CARTÃO: SE APROVADO REGISTRA "c". SE REPROVADO VOLTA AO MENU
+//
+// Nova_Venda --> FLUXO COMPLETO: CARRINHO --> DESCONTO --> RESUMO --> PAGAMENTO
+//     CRIA A VENDA JÁ DENTRO DO VETOR. ( memset ) ZERA TUDO ( Itens = NULL, Quantidade_Itens = 0, SubTotal = 0 ) E DEPOIS DEFINE NÚMERO E SITUAÇÃO 'a'
+//     O ( while ( Adicionar_Item ) ) NÃO TEM CORPO: A PRÓPRIA FUNÇÃO PEDE OS DADOS E RETORNA 0 QUANDO O OPERADOR DIGITA 0
+//     CARRINHO VAZIO CANCELA A VENDA ( LIBERA Itens E DEVOLVE A POSIÇÃO COM Quantidade_Vendas-- )
+//     DESCONTO ( RF08 ) DE 0 A 100. TOTAL = SUBTOTAL * ( 1 - DESCONTO / 100 ). EXEMPLO: 100,00 COM 10% --> 90,00
+//     DEPOIS PERGUNTA SE QUER PAGAR AGORA. SE NÃO, A VENDA FICA EM ABERTO
+//
+// Pagar_Venda_Aberta --> RF11. LISTA AS VENDAS COM SITUAÇÃO 'a', PEDE O NÚMERO E CHAMA ( Processar_Pagamento ). SÓ ACEITA VENDA QUE EXISTE E ESTÁ ABERTA
+//
+// Relatorio_Vendas --> LISTA TODAS AS VENDAS COM ITENS E, PARA CADA UMA, PROCURA EM TODOS OS PAGAMENTOS OS QUE PERTENCEM A ELA ( PELO NÚMERO )
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE VENDAS ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DE VENDAS ------|
+
+void Imprimir_Itens(const Venda *V)
+{
+    printf("\n%-8s %-22s %-10s %-5s %-10s\n",
+           "CODIGO", "DESCRICAO", "PRECO", "QTD", "TOTAL");
+
+    for (int i = 0; i < V->Quantidade_Itens; i++)
+    {
+        printf("%-8d %-22s R$ %-7.2f %-5d R$ %-7.2f\n",
+               V->Itens[i].Codigo, V->Itens[i].Descricao,
+               V->Itens[i].Preco_Venda, V->Itens[i].Quantidade,
+               V->Itens[i].Total);
+    }
+}
+
+int Adicionar_Item(Sistema *Sis, int Iv)
+{
+    Venda      *V = &Sis->vendas[Iv];
+    Produto    *P;
+    Item_Venda *It;
+    int         Codigo, Indice, Quantidade;
+    double      Preco;
+
+    Codigo = Ler_Int("\nCodigo do produto (0 para finalizar): ");
+
+    if (Codigo == 0)
+    {
+        return 0;
+    }
+
+    Indice = Buscar_Produto(Sis, Codigo);
+
+    if (Indice == -1 || !Sis->produtos[Indice].Ativo)
+    {
+        printf("Produto nao encontrado ou descontinuado!\n");
+        return 1;
+    }
+
+    P = &Sis->produtos[Indice];
+
+    // --> RN03 - ESTOQUE ZERADO
+    if (P->Estoque <= 0)
+    {
+        printf("Produto %s indisponivel: estoque zerado!\n", P->Descricao);
+        return 1;
+    }
+
+    // --> RN01 - ESTOQUE MÍNIMO
+    if (P->Estoque <= P->Estoque_Minimo)
+    {
+        printf("ALERTA: %s atingiu o estoque minimo (%d)! Estoque atual: %d\n",
+               P->Descricao, P->Estoque_Minimo, P->Estoque);
+    }
+
+    Quantidade = Ler_Int("Quantidade: ");
+
+    if (Quantidade <= 0)
+    {
+        printf("Quantidade invalida!\n");
+        return 1;
+    }
+
+    // --> RN02 - QUANTIDADE MAIOR QUE O ESTOQUE
+    if (Quantidade > P->Estoque)
+    {
+        printf("Estoque insuficiente! Disponivel: %d unidade(s).\n", P->Estoque);
+
+        if (!Confirmar("Deseja levar apenas a quantidade disponivel?"))
+        {
+            printf("Item nao adicionado.\n");
+            return 1;
+        }
+
+        Quantidade = P->Estoque;
+    }
+
+    Preco = Calcular_Preco_Venda(P);   // --> CONGELA O PREÇO DE AGORA
+
+    V->Itens = Expandir(V->Itens, &V->Capacidade_Itens,
+                        V->Quantidade_Itens, sizeof(Item_Venda));
+
+    It = &V->Itens[V->Quantidade_Itens];
+    It->Codigo = P->Codigo;
+    strncpy(It->Descricao, P->Descricao, sizeof It->Descricao - 1);
+    It->Descricao[sizeof It->Descricao - 1] = '\0';
+    It->Preco_Venda = Preco;
+    It->Quantidade  = Quantidade;
+    It->Total       = Arredondar2(Preco * Quantidade);
+
+    V->SubTotal = Arredondar2(V->SubTotal + It->Total);
+    V->Quantidade_Itens++;
+
+    P->Estoque -= Quantidade;          // --> BAIXA O ESTOQUE NA HORA
+
+    printf("Adicionado: %d x %s a R$ %.2f\n", Quantidade, P->Descricao, Preco);
+    printf("Total do carrinho: R$ %.2f\n", V->SubTotal);
+
+    if (P->Estoque <= P->Estoque_Minimo)
+    {
+        printf("ALERTA: %s esta no estoque minimo! Restam %d.\n",
+               P->Descricao, P->Estoque);
+    }
+
+    return 1;
+}
+
+void Registrar_Pagamento(Sistema *Sis, int Iv, const char *Tipo,
+                         double Dinheiro, double Cartao)
+{
+    Pagamento *Pg;
+
+    Sis->pagamentos = Expandir(Sis->pagamentos, &Sis->Capacidade_Pagamentos,
+                               Sis->Quantidade_Pagamentos, sizeof(Pagamento));
+
+    Pg = &Sis->pagamentos[Sis->Quantidade_Pagamentos];
+    Pg->Numero_Venda   = Sis->vendas[Iv].Numero;
+    Pg->Valor_Pago     = Arredondar2(Dinheiro + Cartao);
+    strcpy(Pg->Tipo, Tipo);            // --> Tipo[3] COMPORTA "dc" + '\0'
+    Pg->Valor_Dinheiro = Dinheiro;
+    Pg->Valor_Cartao   = Cartao;
+
+    Sis->Quantidade_Pagamentos++;
+    Sis->vendas[Iv].Situacao = 'p';    // --> A VENDA DEIXA DE ESTAR ABERTA
+}
+
+int Consultar_Maquininha(void)
+{
+    int Status;
+
+    do
+    {
+        Status = Ler_Int("Maquininha (1 = aprovado, 0 = reprovado): ");
+    } while (Status != 0 && Status != 1);
+
+    return Status;
+}
+
+int Processar_Pagamento(Sistema *Sis, int Iv)
+{
+    double Total = Sis->vendas[Iv].Total;
+    int    Opcao;
+
+    while (1)
+    {
+        printf("\n||======================================||\n");
+        printf("||          FORMA DE PAGAMENTO          ||\n");
+        printf("||======================================||\n");
+        printf("|| Total a pagar: R$ %-18.2f ||\n", Total);
+        printf("|| 1 - Dinheiro                         ||\n");
+        printf("|| 2 - Cartao                           ||\n");
+        printf("|| 0 - Voltar (manter venda em aberto)  ||\n");
+        printf("||======================================||\n");
+
+        Opcao = Ler_Int("Escolha: ");
+
+        if (Opcao == 0)
+        {
+            return 0;
+        }
+
+        if (Opcao == 1)
+        {
+            double Recebido = Ler_Double("Valor recebido em dinheiro: R$ ");
+
+            if (Recebido <= 0)
+            {
+                printf("Valor invalido!\n");
+                continue;
+            }
+
+            if (Recebido + 0.004 >= Total)
+            {
+                printf("Troco: R$ %.2f\n", Recebido - Total);
+                Registrar_Pagamento(Sis, Iv, "d", Total, 0.0);
+                printf("\nCOMPRA CONCLUIDA!\n");
+                return 1;
+            }
+
+            // --> RF09 - DINHEIRO INSUFICIENTE: OFERECER O RESTANTE EM CARTÃO
+            printf("Dinheiro insuficiente! Faltam R$ %.2f.\n", Total - Recebido);
+
+            if (Confirmar("Pagar o restante em cartao?"))
+            {
+                double Restante = Arredondar2(Total - Recebido);
+
+                if (Consultar_Maquininha() == 1)
+                {
+                    Registrar_Pagamento(Sis, Iv, "dc", Recebido, Restante);
+                    printf("\nPagamento misto registrado. COMPRA CONCLUIDA!\n");
+                    return 1;
+                }
+
+                printf("Cartao reprovado! Escolha a forma de pagamento novamente.\n");
+            }
+        }
+        else if (Opcao == 2)
+        {
+            if (Consultar_Maquininha() == 1)
+            {
+                Registrar_Pagamento(Sis, Iv, "c", 0.0, Total);
+                printf("\nCartao aprovado. COMPRA CONCLUIDA!\n");
+                return 1;
+            }
+
+            printf("Cartao reprovado! Escolha a forma de pagamento novamente.\n");
+        }
+        else
+        {
+            printf("Opcao invalida!\n");
+        }
+    }
+}
+
+void Nova_Venda(Sistema *Sis)
+{
+    Venda *V;
+    int    Iv;
+    double Perc;
+
+    if (!Verificar_Caixa_Aberto(Sis))
+    {
+        return;
+    }
+
+    if (Sis->Quantidade_Produtos == 0)
+    {
+        printf("\nNao ha produtos cadastrados!\n");
+        Pausar();
+        return;
+    }
+
+    Sis->vendas = Expandir(Sis->vendas, &Sis->Capacidade_Vendas,
+                           Sis->Quantidade_Vendas, sizeof(Venda));
+
+    Iv = Sis->Quantidade_Vendas;
+    V  = &Sis->vendas[Iv];
+    memset(V, 0, sizeof *V);           // --> ZERA TUDO ( Itens = NULL, contadores = 0 )
+    V->Numero   = Iv + 1;
+    V->Situacao = 'a';
+    Sis->Quantidade_Vendas++;
+
+    Mostrar_Catalogo_Venda(Sis);
+    printf("\n--- Venda numero %d ---\n", V->Numero);
+
+    while (Adicionar_Item(Sis, Iv))
+    {
+        // --> REPETE ATÉ O OPERADOR FINALIZAR O CARRINHO
+    }
+
+    if (V->Quantidade_Itens == 0)
+    {
+        printf("\nCarrinho vazio. Venda cancelada.\n");
+        free(V->Itens);
+        Sis->Quantidade_Vendas--;      // --> DEVOLVE A POSIÇÃO NO VETOR DE VENDAS
+        Pausar();
+        return;
+    }
+
+    // --> RF08 - DESCONTO INFORMADO
+    do
+    {
+        Perc = Ler_Double("\nDesconto em % (0 para nenhum): ");
+
+        if (Perc < 0 || Perc > 100)
+        {
+            printf("Percentual invalido! Informe de 0 a 100.\n");
+        }
+    } while (Perc < 0 || Perc > 100);
+
+    V->Percentual_Desconto = Perc;
+    V->Total = Arredondar2(V->SubTotal * (1.0 - Perc / 100.0));
+
+    Imprimir_Titulo("RESUMO DA VENDA");
+    Imprimir_Itens(V);
+    printf("\nSubtotal : R$ %.2f\n", V->SubTotal);
+    printf("Desconto : %.2f%%\n", V->Percentual_Desconto);
+    printf("TOTAL    : R$ %.2f\n", V->Total);
+
+    if (Confirmar("\nDeseja pagar agora?"))
+    {
+        if (!Processar_Pagamento(Sis, Iv))
+        {
+            printf("\nVenda %d mantida em aberto.\n", V->Numero);
+        }
+    }
+    else
+    {
+        printf("\nVenda %d mantida em aberto. Use a opcao Pagamento para conclui-la.\n",
+               V->Numero);
+    }
+
+    Pausar();
+}
+
+void Pagar_Venda_Aberta(Sistema *Sis)
+{
+    int Abertas = 0;
+    int Numero, Iv;
+
+    if (!Verificar_Caixa_Aberto(Sis))
+    {
+        return;
+    }
+
+    Imprimir_Titulo("PAGAMENTO DE VENDAS EM ABERTO");
+
+    for (int i = 0; i < Sis->Quantidade_Vendas; i++)
+    {
+        if (Sis->vendas[i].Situacao == 'a')
+        {
+            printf("Venda %d - %d item(ns) - Total: R$ %.2f\n",
+                   Sis->vendas[i].Numero, Sis->vendas[i].Quantidade_Itens,
+                   Sis->vendas[i].Total);
+            Abertas++;
+        }
+    }
+
+    if (Abertas == 0)
+    {
+        printf("Nao ha vendas em aberto.\n");
+        Pausar();
+        return;
+    }
+
+    Numero = Ler_Int("\nNumero da venda (0 para voltar): ");
+
+    if (Numero == 0)
+    {
+        return;
+    }
+
+    Iv = Buscar_Venda(Sis, Numero);
+
+    if (Iv == -1 || Sis->vendas[Iv].Situacao != 'a')
+    {
+        printf("Venda aberta nao encontrada!\n");
+        Pausar();
+        return;
+    }
+
+    Imprimir_Itens(&Sis->vendas[Iv]);
+    printf("\nTOTAL: R$ %.2f\n", Sis->vendas[Iv].Total);
+
+    Processar_Pagamento(Sis, Iv);
+    Pausar();
+}
+
+void Relatorio_Vendas(const Sistema *Sis)
+{
+    Imprimir_Titulo("LISTAGEM DAS VENDAS");
+
+    if (Sis->Quantidade_Vendas == 0)
+    {
+        printf("Nenhuma venda registrada.\n");
+        Pausar();
+        return;
+    }
+
+    for (int i = 0; i < Sis->Quantidade_Vendas; i++)
+    {
+        const Venda *V = &Sis->vendas[i];
+
+        printf("\n=== Venda %d - %s ===", V->Numero,
+               V->Situacao == 'p' ? "PAGO (p)" : "ABERTO (a)");
+        Imprimir_Itens(V);
+        printf("Subtotal: R$ %.2f | Desconto: %.2f%% | Total: R$ %.2f\n",
+               V->SubTotal, V->Percentual_Desconto, V->Total);
+
+        for (int j = 0; j < Sis->Quantidade_Pagamentos; j++)
+        {
+            const Pagamento *Pg = &Sis->pagamentos[j];
+
+            if (Pg->Numero_Venda == V->Numero)
+            {
+                printf("Pagamento: tipo %s | pago R$ %.2f (dinheiro R$ %.2f, cartao R$ %.2f)\n",
+                       Pg->Tipo, Pg->Valor_Pago, Pg->Valor_Dinheiro, Pg->Valor_Cartao);
+            }
+        }
+    }
+
+    Pausar();
+}
+
+// |------ FIM DE VENDAS ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE PERSISTENCIA ------|
+
+// OS DADOS SÃO SALVOS EM ARQUIVOS DE TEXTO, UM REGISTRO POR LINHA, COM OS CAMPOS SEPARADOS POR ( | ).
+// POR ISSO O ( Ler_Texto ) TROCA ( | ) POR ( - ): UM ( | ) DENTRO DO TEXTO QUEBRARIA A LEITURA
+//
+// Gravar_Dados --> ABRE CADA ARQUIVO COM ( fopen "w" ), QUE CRIA OU SOBRESCREVE, ESCREVE COM ( fprintf ) E FECHA COM ( fclose ). RETORNA 1 SE DEU CERTO E 0 SE NÃO ABRIU
+//     O ARQUIVO DE VENDAS MISTURA DOIS TIPOS DE LINHA:  V|...  É O CABEÇALHO DA VENDA  /  I|...  É UM ITEM QUE PERTENCE À ÚLTIMA VENDA ( V ) ACIMA DELE
+//
+// Carregar_Dados --> LÊ OS ARQUIVOS SE EXISTIREM. SE NÃO EXISTIR, ( fopen ) RETORNA NULL E O BLOCO É PULADO
+//     ( fgets ) LÊ UMA LINHA, ( strcspn ) TIRA O ENTER E ( sscanf ) SEPARA OS CAMPOS
+//     NO ( sscanf ): ( %99[^|] ) LÊ ATÉ 99 CARACTERES PARANDO NO ( | ). O LIMITE EVITA ESTOURAR O BUFFER.
+//     ( %lf ) LÊ UM ( double ) ( NO printf É ( %f ), MAS NO scanf PRECISA SER ( %lf ) ). ( %c ) LÊ UM CARACTERE
+//     O RETORNO DO ( sscanf ) É QUANTOS CAMPOS FORAM LIDOS. COMPARANDO COM O ESPERADO ( == 7, == 8 ... ) DESCARTA LINHAS CORROMPIDAS
+//     PARA PRODUTOS, TAMBÉM DESCARTA CATEGORIA FORA DE 1 A 3, POIS ELA É USADA COMO ÍNDICE DE ( Nomes_Categoria )
+//     NAS VENDAS, A LINHA V CRIA UMA VENDA NOVA E A LINHA I ADICIONA O ITEM NA ÚLTIMA VENDA LIDA ( Quantidade_Vendas - 1 )
+//     NO FINAL, SE NÃO HOUVER PRODUTOS ( PRIMEIRA EXECUÇÃO ), CARREGA OS PRODUTOS DE EXEMPLO
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE PERSISTENCIA ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DE PERSISTENCIA ------|
+
+int Gravar_Dados(const Sistema *Sis)
+{
+    FILE *F;
+
+    F = fopen(Arquivo_Clientes, "w");
+    if (F == NULL) return 0;
+    for (int i = 0; i < Sis->Quantidade_Clientes; i++)
+    {
+        const Cliente *C = &Sis->clientes[i];
+        fprintf(F, "%d|%s|%s|%s|%s|%s|%s\n", C->Codigo, C->Nome, C->NomeSocial,
+                C->Cpf, C->Rua_e_Numero, C->Bairro, C->Celular);
+    }
+    fclose(F);
+
+    F = fopen(Arquivo_Produtos, "w");
+    if (F == NULL) return 0;
+    for (int i = 0; i < Sis->Quantidade_Produtos; i++)
+    {
+        const Produto *P = &Sis->produtos[i];
+        fprintf(F, "%d|%s|%d|%.2f|%.2f|%d|%d|%d\n", P->Codigo, P->Descricao,
+                P->Categoria, P->Preco_Compra, P->Margem_Lucro, P->Estoque,
+                P->Estoque_Minimo, P->Ativo);
+    }
+    fclose(F);
+
+    F = fopen(Arquivo_Vendas, "w");
+    if (F == NULL) return 0;
+    for (int i = 0; i < Sis->Quantidade_Vendas; i++)
+    {
+        const Venda *V = &Sis->vendas[i];
+        fprintf(F, "V|%d|%c|%.2f|%.2f|%.2f\n", V->Numero, V->Situacao,
+                V->Percentual_Desconto, V->SubTotal, V->Total);
+        for (int j = 0; j < V->Quantidade_Itens; j++)
+        {
+            const Item_Venda *It = &V->Itens[j];
+            fprintf(F, "I|%d|%s|%.2f|%d|%.2f\n", It->Codigo, It->Descricao,
+                    It->Preco_Venda, It->Quantidade, It->Total);
+        }
+    }
+    fclose(F);
+
+    F = fopen(Arquivo_Pagamentos, "w");
+    if (F == NULL) return 0;
+    for (int i = 0; i < Sis->Quantidade_Pagamentos; i++)
+    {
+        const Pagamento *Pg = &Sis->pagamentos[i];
+        fprintf(F, "%d|%.2f|%s|%.2f|%.2f\n", Pg->Numero_Venda, Pg->Valor_Pago,
+                Pg->Tipo, Pg->Valor_Dinheiro, Pg->Valor_Cartao);
+    }
+    fclose(F);
+
+    return 1;
+}
+
+void Carregar_Dados(Sistema *Sis)
+{
+    FILE *F;
+    char  Linha[Tamanho_Linha];
+
+    // --> CLIENTES
+    F = fopen(Arquivo_Clientes, "r");
+    if (F != NULL)
+    {
+        while (fgets(Linha, sizeof Linha, F) != NULL)
+        {
+            Cliente C;
+            Linha[strcspn(Linha, "\r\n")] = '\0';
+
+            if (sscanf(Linha, "%d|%99[^|]|%99[^|]|%14[^|]|%99[^|]|%49[^|]|%19[^|]",
+                       &C.Codigo, C.Nome, C.NomeSocial, C.Cpf,
+                       C.Rua_e_Numero, C.Bairro, C.Celular) == 7)
+            {
+                Sis->clientes = Expandir(Sis->clientes, &Sis->Capacidade_Clientes,
+                                         Sis->Quantidade_Clientes, sizeof(Cliente));
+                Sis->clientes[Sis->Quantidade_Clientes++] = C;   // --> COPIA A STRUCT INTEIRA
+            }
+        }
+        fclose(F);
+    }
+
+    // --> PRODUTOS
+    F = fopen(Arquivo_Produtos, "r");
+    if (F != NULL)
+    {
+        while (fgets(Linha, sizeof Linha, F) != NULL)
+        {
+            Produto P;
+            Linha[strcspn(Linha, "\r\n")] = '\0';
+
+            if (sscanf(Linha, "%d|%49[^|]|%d|%lf|%lf|%d|%d|%d",
+                       &P.Codigo, P.Descricao, &P.Categoria, &P.Preco_Compra,
+                       &P.Margem_Lucro, &P.Estoque, &P.Estoque_Minimo,
+                       &P.Ativo) == 8
+                && P.Categoria >= 1 && P.Categoria <= 3)
+            {
+                Sis->produtos = Expandir(Sis->produtos, &Sis->Capacidade_Produtos,
+                                         Sis->Quantidade_Produtos, sizeof(Produto));
+                Sis->produtos[Sis->Quantidade_Produtos++] = P;
+            }
+        }
+        fclose(F);
+    }
+
+    // --> VENDAS ( LINHAS V E I MISTURADAS )
+    F = fopen(Arquivo_Vendas, "r");
+    if (F != NULL)
+    {
+        while (fgets(Linha, sizeof Linha, F) != NULL)
+        {
+            Linha[strcspn(Linha, "\r\n")] = '\0';
+
+            if (Linha[0] == 'V')
+            {
+                Venda V;
+                memset(&V, 0, sizeof V);
+
+                if (sscanf(Linha, "V|%d|%c|%lf|%lf|%lf", &V.Numero,
+                           &V.Situacao, &V.Percentual_Desconto, &V.SubTotal,
+                           &V.Total) == 5)
+                {
+                    Sis->vendas = Expandir(Sis->vendas, &Sis->Capacidade_Vendas,
+                                           Sis->Quantidade_Vendas, sizeof(Venda));
+                    Sis->vendas[Sis->Quantidade_Vendas++] = V;
+                }
+            }
+            else if (Linha[0] == 'I' && Sis->Quantidade_Vendas > 0)
+            {
+                Venda     *V = &Sis->vendas[Sis->Quantidade_Vendas - 1];   // --> ÚLTIMA VENDA LIDA
+                Item_Venda It;
+
+                if (sscanf(Linha, "I|%d|%49[^|]|%lf|%d|%lf", &It.Codigo,
+                           It.Descricao, &It.Preco_Venda, &It.Quantidade,
+                           &It.Total) == 5)
+                {
+                    V->Itens = Expandir(V->Itens, &V->Capacidade_Itens,
+                                        V->Quantidade_Itens, sizeof(Item_Venda));
+                    V->Itens[V->Quantidade_Itens++] = It;
+                }
+            }
+        }
+        fclose(F);
+    }
+
+    // --> PAGAMENTOS
+    F = fopen(Arquivo_Pagamentos, "r");
+    if (F != NULL)
+    {
+        while (fgets(Linha, sizeof Linha, F) != NULL)
+        {
+            Pagamento Pg;
+            Linha[strcspn(Linha, "\r\n")] = '\0';
+
+            if (sscanf(Linha, "%d|%lf|%2[^|]|%lf|%lf", &Pg.Numero_Venda,
+                       &Pg.Valor_Pago, Pg.Tipo, &Pg.Valor_Dinheiro,
+                       &Pg.Valor_Cartao) == 5)
+            {
+                Sis->pagamentos = Expandir(Sis->pagamentos, &Sis->Capacidade_Pagamentos,
+                                           Sis->Quantidade_Pagamentos, sizeof(Pagamento));
+                Sis->pagamentos[Sis->Quantidade_Pagamentos++] = Pg;
+            }
+        }
+        fclose(F);
+    }
+
+    if (Sis->Quantidade_Produtos == 0)
+    {
+        Carregar_Produtos_Exemplo(Sis);
+    }
+}
+
+// |------ FIM DE PERSISTENCIA ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DE MENUS ------|
+
+// TODOS OS MENUS SEGUEM O MESMO PADRÃO:
+//     do { LIMPA A TELA, MOSTRA AS OPÇÕES, LÊ A OPÇÃO, switch } while ( OPÇÃO != SAIR );
+// O ( case ) DA OPÇÃO DE SAIR FICA VAZIO, SÓ PARA O LAÇO TERMINAR. O ( default ) TRATA OPÇÃO INVÁLIDA
+//
+// Menu_Cadastro_Produtos --> CADASTRAR, ALTERAR MARGEM E DESCONTINUAR PRODUTO ( SAI COM 0 )
+// Menu_Cadastros --> ESCOLHE ENTRE CLIENTES E PRODUTOS ( SAI COM 3 )
+// Menu_Vendas --> NOVA VENDA, SANGRIA E PAGAMENTO DE VENDA EM ABERTO ( SAI COM 4 )
+// Menu_Relatorios --> LISTAGENS DE CLIENTES, PRODUTOS E VENDAS ( SAI COM 4 )
+//
+// Sair_Do_Sistema --> RETORNA 1 SE PODE ENCERRAR. NÃO DEIXA SAIR COM O CAIXA ABERTO. PERGUNTA SE QUER GRAVAR OS DADOS E CHAMA ( Gravar_Dados )
+//
+// Menu_Principal --> MENU INICIAL. MOSTRA SE O CAIXA ESTÁ ABERTO OU FECHADO.
+//     NA OPÇÃO 6, SE ( Sair_Do_Sistema ) RETORNAR 0, A VARIÁVEL ( Opcao ) VIRA 0 PARA O LAÇO ( while ( Opcao != 6 ) ) CONTINUAR
+//
+// Liberar_Sistema --> LIBERA TODA A MEMÓRIA ALOCADA COM ( free ). OS ITENS DE CADA VENDA SÃO VETORES SEPARADOS,
+//     ENTÃO PRECISAM SER LIBERADOS ANTES DO VETOR DE VENDAS QUE OS CONTÉM
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DE MENUS ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DOS MENUS ------|
+
+void Menu_Cadastro_Produtos(Sistema *Sis)
+{
+    int Opcao;
+
+    do
+    {
+        Limpar_Tela();
+        Imprimir_Titulo("CADASTRO DE PRODUTOS");
+        printf("|| 1 - Cadastrar novo produto\n");
+        printf("|| 2 - Alterar margem de lucro\n");
+        printf("|| 3 - Descontinuar produto\n");
+        printf("|| 0 - Retornar\n");
+
+        Opcao = Ler_Int("Escolha uma opcao: ");
+
+        switch (Opcao)
+        {
+            case 1: Cadastrar_Produto(Sis);    break;
+            case 2: Alterar_Margem(Sis);       break;
+            case 3: Descontinuar_Produto(Sis); break;
+            case 0:                            break;
+            default: printf("Opcao invalida!\n"); Pausar();
+        }
+    } while (Opcao != 0);
+}
+
+void Menu_Cadastros(Sistema *Sis)
+{
+    int Opcao;
+
+    do
+    {
+        Limpar_Tela();
+        Imprimir_Titulo("CADASTROS");
+        printf("|| 1 - Cadastro de Clientes\n");
+        printf("|| 2 - Cadastro de Produtos\n");
+        printf("|| 3 - Retornar ao Menu Principal\n");
+
+        Opcao = Ler_Int("Escolha uma opcao: ");
+
+        switch (Opcao)
+        {
+            case 1: Cadastrar_Cliente(Sis);       break;
+            case 2: Menu_Cadastro_Produtos(Sis);  break;
+            case 3:                               break;
+            default: printf("Opcao invalida!\n"); Pausar();
+        }
+    } while (Opcao != 3);
+}
+
+void Menu_Vendas(Sistema *Sis)
+{
+    int Opcao;
+
+    do
+    {
+        Limpar_Tela();
+        Imprimir_Titulo("VENDAS");
+        printf("|| 1 - Nova venda\n");
+        printf("|| 2 - Retirada de Caixa (Sangria)\n");
+        printf("|| 3 - Pagamento\n");
+        printf("|| 4 - Retornar ao Menu Principal\n");
+
+        Opcao = Ler_Int("Escolha uma opcao: ");
+
+        switch (Opcao)
+        {
+            case 1: Nova_Venda(Sis);          break;
+            case 2: Retirada_Caixa(Sis);      break;
+            case 3: Pagar_Venda_Aberta(Sis);  break;
+            case 4:                           break;
+            default: printf("Opcao invalida!\n"); Pausar();
+        }
+    } while (Opcao != 4);
+}
+
+void Menu_Relatorios(Sistema *Sis)
+{
+    int Opcao;
+
+    do
+    {
+        Limpar_Tela();
+        Imprimir_Titulo("RELATORIOS");
+        printf("|| 1 - Listagem dos Clientes\n");
+        printf("|| 2 - Listagem dos Produtos\n");
+        printf("|| 3 - Listagem das Vendas\n");
+        printf("|| 4 - Retornar ao Menu Principal\n");
+
+        Opcao = Ler_Int("Escolha uma opcao: ");
+
+        switch (Opcao)
+        {
+            case 1: Relatorio_Clientes(Sis); break;
+            case 2: Relatorio_Produtos(Sis); break;
+            case 3: Relatorio_Vendas(Sis);   break;
+            case 4:                          break;
+            default: printf("Opcao invalida!\n"); Pausar();
+        }
+    } while (Opcao != 4);
+}
+
+int Sair_Do_Sistema(const Sistema *Sis)
+{
+    if (Sis->Caixa_Aberto)
+    {
+        printf("\nFeche o caixa antes de sair!\n");
+        Pausar();
+        return 0;
+    }
+
+    if (Confirmar("\nDeseja gravar os dados em arquivo?"))
+    {
+        if (Gravar_Dados(Sis))
+        {
+            printf("Dados gravados com sucesso!\n");
+        }
+        else
+        {
+            printf("Erro ao gravar os arquivos!\n");
+        }
+    }
+
+    Imprimir_Titulo("PROGRAMA ENCERRADO - OBRIGADO!");
+    return 1;
+}
+
+void Menu_Principal(Sistema *Sis)
+{
+    int Opcao;
+
+    do
+    {
+        Limpar_Tela();
+        Imprimir_Titulo("SISTEMA DA BERE 3");
+        printf("|| Caixa: %s\n", Sis->Caixa_Aberto ? "ABERTO" : "FECHADO");
+        printf("|| 1 - Cadastros\n");
+        printf("|| 2 - Vendas\n");
+        printf("|| 3 - Abertura de Caixa\n");
+        printf("|| 4 - Fechamento de Caixa\n");
+        printf("|| 5 - Relatorios\n");
+        printf("|| 6 - Sair\n");
+
+        Opcao = Ler_Int("Escolha uma opcao: ");
+
+        switch (Opcao)
+        {
+            case 1: Menu_Cadastros(Sis);   break;
+            case 2: Menu_Vendas(Sis);      break;
+            case 3: Abrir_Caixa(Sis);      break;
+            case 4: Fechar_Caixa(Sis);     break;
+            case 5: Menu_Relatorios(Sis);  break;
+            case 6:
+                if (!Sair_Do_Sistema(Sis))
+                {
+                    Opcao = 0;             // --> CONTINUA NO MENU
+                }
+                break;
+            default:
+                printf("Opcao invalida!\n");
+                Pausar();
+        }
+    } while (Opcao != 6);
+}
+
+void Liberar_Sistema(Sistema *Sis)
+{
+    for (int i = 0; i < Sis->Quantidade_Vendas; i++)
+    {
+        free(Sis->vendas[i].Itens);    // --> PRIMEIRO OS ITENS DE CADA VENDA
+    }
+
+    free(Sis->clientes);
+    free(Sis->produtos);
+    free(Sis->vendas);
+    free(Sis->pagamentos);
+}
+
+// |------ FIM DOS MENUS ------|
+
+// |---------------------------------------------------------|
+
+// |------ EXPLICAÇÃO DA PARTE DO MAIN ------|
+
+// ( Sistema Sis ) É A ÚNICA VARIÁVEL DO PROGRAMA, CRIADA AQUI E PASSADA POR PONTEIRO ( &Sis ) PARA AS FUNÇÕES
+// ( memset ) ZERA TUDO: OS PONTEIROS FICAM NULL E OS CONTADORES 0, QUE É O ESTADO CORRETO PARA A FUNÇÃO ( Expandir ) COMEÇAR A ALOCAR DO ZERO
+// ORDEM: Carregar_Dados ( PREPARA AS ESTRUTURAS E LÊ OS ARQUIVOS, SE HOUVER ) --> Abrir_Caixa ( O FLUXO COMEÇA COM A ABERTURA )
+//        --> Menu_Principal --> Liberar_Sistema ( DEVOLVE A MEMÓRIA ANTES DE ENCERRAR )
+
+// |------ FIM DA EXPLICAÇÃO DA PARTE DO MAIN ------|
+
+// |---------------------------------------------------------|
+
+// |------ INICIO DO MAIN ------|
+
+int main(void)
+{
+    Sistema Sis;
+
+    memset(&Sis, 0, sizeof Sis);
+
+    Carregar_Dados(&Sis);
+    Abrir_Caixa(&Sis);
+    Menu_Principal(&Sis);
+    Liberar_Sistema(&Sis);
+
+    return 0;
+}
+
+// |------ FIM DO MAIN ------|
